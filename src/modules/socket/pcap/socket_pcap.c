@@ -148,12 +148,27 @@ int reload_config (char *erbuf, int erlen) {
 
 /* Callback function that is passed to pcap_loop() */
 void callback_proto(u_char *useless, struct pcap_pkthdr *pkthdr, u_char *packet) {
+	
+	unsigned char* ethaddr = NULL;
+	unsigned char* mplsaddr = NULL;
 
+        /* Pat Callahan's patch for MPLS */
+	memcpy(&ethaddr, (packet + 12), 2);
+        memcpy(&mplsaddr, (packet + 16), 2);
+        
+        if (ntohs((uint16_t)*(&ethaddr)) == 0x8100) {
+          if (ntohs((uint16_t)*(&mplsaddr)) == 0x8847) {
+             hdr_offset = 8;
+          } else {
+             hdr_offset = 4;
+          }
+        }
+        
         struct ethhdr *eth = (struct ethhdr *)packet;
         
-	struct ip *ip4_pkt = (struct ip *) (packet + link_offset);
+	struct ip *ip4_pkt = (struct ip *) (packet + link_offset + hdr_offset);
 #if USE_IPv6
-	struct ip6_hdr *ip6_pkt = (struct ip6_hdr*)(packet + link_offset);
+        struct ip6_hdr *ip6_pkt = (struct ip6_hdr*)(packet + link_offset + ((ntohs((uint16_t)*(packet + 12)) == 0x8100)? 4: 0) );
 #endif
 
 	uint8_t loc_index = (uint8_t *) useless;
@@ -257,7 +272,7 @@ void callback_proto(u_char *useless, struct pcap_pkthdr *pkthdr, u_char *packet)
 		data = (char *) (tcp_pkt) + tcphdr_offset;
 		_msg.hdr_len = link_offset + ip_hl + tcphdr_offset;
 		
-		len -= link_offset + ip_hl + tcphdr_offset;
+		len -= link_offset + ip_hl + tcphdr_offset + hdr_offset;
 
 		stats.recieved_tcp_packets++;
 
@@ -305,7 +320,7 @@ void callback_proto(u_char *useless, struct pcap_pkthdr *pkthdr, u_char *packet)
 		data = (char *) (udp_pkt) + udphdr_offset;
 		_msg.hdr_len = link_offset + ip_hl + udphdr_offset;
 		
-		len -= link_offset + ip_hl + udphdr_offset;
+		len -= link_offset + ip_hl + udphdr_offset + hdr_offset;
 
 #if USE_IPv6
 		if (ip_ver == 6)
