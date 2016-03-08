@@ -151,6 +151,7 @@ void callback_proto(u_char *useless, struct pcap_pkthdr *pkthdr, u_char *packet)
 	
 	unsigned char* ethaddr = NULL;
 	unsigned char* mplsaddr = NULL;
+	uint8_t hdr_offset = 0;
 
         /* Pat Callahan's patch for MPLS */
 	memcpy(&ethaddr, (packet + 12), 2);
